@@ -15,8 +15,6 @@ with a key press.
 However I wanted something like that to be available from the system prompt,
 as a standalone application.
 Enter SCRSAV project, written in Aztec C version 1.05.
-I will soon include compiled binary for those that don't have Aztec C compiler
-or don't want to mess with it.
 
 Enjoy!
 
