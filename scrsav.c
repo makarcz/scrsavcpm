@@ -7,7 +7,16 @@
  * File:    scrsav.c
  * OS:      Commodore 128 CP/M
  * Compilr: Aztec C.
+ *
  * TO DO:
+ *
+ * REVISION HISTORY:
+ *
+ * 1/3/2020 - The coordinates of time display change every 100 seconds to
+ *            prevent CRT burnout.
+ *            Asterisk '*' replaced with a dot '.' symbol.
+ * 4/3/2020 - Screen is cleared more often. Added argument 'blank'.
+ * 5/8/2020 - Added screen blanking at exit.
  *----------------------------------------------------------------------------
  */
 
@@ -24,7 +33,7 @@
 #define MIN (SCB+0x5b)
 #define SCS (SCB+0x5c)
 #define DT  (SCB+0x58)
-
+#define DOT '.'
 long next = 1;
 
 /*
@@ -230,40 +239,50 @@ main (argc, argv)
    int argc;
    char *argv[];
 {
-   unsigned row, col;
-   int ct, sec;
+   unsigned row, col, trow;
+   int ct, sec, blank = 0;
    long dtm = 0;
-   char c = '*';
+   char c = DOT;
    char pwd[PWL];
 
    printf("Screen Saver (C) Marek Karcz 2019. All rights reserved.\n");
    
-   if (argc > 1) {
+   if (argc > 1) { /* scan command line for arguments / options */
 
-      StrToLower(argv[1]);
-      printf("Argument: %s\n", argv[1]);
-      if (0 == strcmp(argv[1], "lock")) {
+      for (ct = 1; ct < argc; ct++) {
+      
+        StrToLower(argv[ct]);
+        printf("Argument: %s\n", argv[ct]);
+        if (0 == strcmp(argv[ct], "lock")) {
 
-         while(KeyPress()); /* clear waiting characters */
-         clear(pwd, 7, 0);
-         printf("Enter the passphrase that will be used to unlock ");
-         printf("the screen.\n");
-         printf("(CTRL-H to BS/DEL, RETURN or ESC to end, 1-6 characters)\n");
-         printf("Password:");
-         GetPwd(pwd, PWL);
-         putchar(NL);
-      }
-   }
+           while(KeyPress()); /* clear waiting characters */
+           clear(pwd, 7, 0);
+           printf("Enter the passphrase that will be used to unlock ");
+           printf("the screen.\n");
+           printf("(CTRL-H to BS/DEL, RETURN or ESC to end, 1-6 characters)\n");
+           printf("Password:");
+           GetPwd(pwd, PWL);
+           putchar(NL);
+
+        } else if (0 == strcmp(argv[ct], "blank")) {
+
+           blank = 1;
+        }
+      } /* for (ct = 1; ... */
+   } /* if (argc > 1) */
    
    printf("\nProgram runs until a key is pressed.\n");
    printf("If 'lock' is provided as argument, program will ask user to ");
    printf("establish\na 1-6 characters long passphrase to be used to unlock ");
    printf("the screen.\n");
+   printf("If 'blank' is provided as argument, the screen will be blanked\n");
+   printf("for the duration of the run instead of displaying time and random");
+   printf("\ndots / stars.\n");
    StopFor(32000);
    while(KeyPress()); /* clear waiting characters */
    sec = GetDtTm(dtm);
    srand(dtm);   
-   ct = row = col = 0;
+   ct = row = col = trow = 0;
 
    do {
 
@@ -271,29 +290,39 @@ main (argc, argv)
 
       while (!KeyPress()) {
 
+         if (0 < blank) continue; /* skip dots and time if blank mode */
+         /* display or clear a dot at random location */
          row = rand() / 1366 - 1;
          col = rand() / 410 - 1;
          GotoXY(col, row);
          putchar(c);
-         c = ((c == '*') ? ' ' : '*');
+         c = ((c == DOT) ? ' ' : DOT);
          ct++;
-         if (ct > 2000) {
+         if (0 == (ct % 100)) { /* move time disp. to prevent burn-in */
+            GotoXY(0, trow);
+            printf("         ");
+            trow++;
+            if (23 < trow) trow = 0;
+         }
+         if (ct > 500) { /* clear screen, reset counter and RND gen. */
 
             ct = 0;
             srand(dtm);
             BlankScr();
          }
+         /* display time in 1-st column and currently designated row */
          sec = GetDtTm(&dtm);
-         GotoXY(0, 23);
+         GotoXY(0, trow);
          printf("%s", GetTimeStr());
          while (sec == GetDtTm(&dtm)) { /* stop for 1 second */
          
             StopFor(1000);
          }
-      }
+      } /* while (!KeyPress()) */
 
    } while (strlen(pwd) > 0 && CheckPwd(pwd) <= 0);
 
-   return;
-}
+   BlankScr();
 
+   return;
+}
